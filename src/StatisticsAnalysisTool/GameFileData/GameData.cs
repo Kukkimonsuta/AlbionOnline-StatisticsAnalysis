@@ -12,6 +12,7 @@ using StatisticsAnalysisTool.ViewModels;
 using StatisticsAnalysisTool.Views;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -24,7 +25,20 @@ namespace StatisticsAnalysisTool.GameFileData;
 
 public static class GameData
 {
-    public static async Task<bool> InitializeMainGameDataFilesAsync(ServerType serverType)
+    private static readonly ILog Log = LogManager.GetLogger(MethodBase.GetCurrentMethod()?.DeclaringType);
+
+    static String BytesToString(long byteCount)
+    {
+        string[] suf = { "B", "KB", "MB", "GB", "TB", "PB", "EB" }; //Longs run out around EB
+        if (byteCount == 0)
+            return "0" + suf[0];
+        long bytes = Math.Abs(byteCount);
+        int place = Convert.ToInt32(Math.Floor(Math.Log(bytes, 1024)));
+        double num = Math.Round(bytes / Math.Pow(1024, place), 1);
+        return (Math.Sign(byteCount) * num).ToString() + suf[place];
+    }
+
+    public static async Task InitializeMainGameDataFilesAsync()
     {
         if (string.IsNullOrEmpty(SettingsController.CurrentSettings.MainGameFolderPath))
         {
@@ -39,8 +53,21 @@ public static class GameData
                      Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Settings.Default.IndexedItemsFileName),
                      SettingsController.CurrentSettings.MainGameFolderPath, serverType, "items"))
         {
-            await GetMainGameDataAsync(SettingsController.CurrentSettings.MainGameFolderPath, serverType);
-            return true;
+            var sw = Stopwatch.StartNew();
+
+            var memStart = Process.GetCurrentProcess().WorkingSet64;
+            await GetMainGameDataAsync(SettingsController.CurrentSettings.MainGameFolderPath);
+            var memFin = Process.GetCurrentProcess().WorkingSet64;
+
+            sw.Stop();
+
+            var builder = new StringBuilder();
+            builder.AppendLine($"Elapsed: {sw.Elapsed}");
+            builder.AppendLine($"Memory: {BytesToString(memFin - memStart)}");
+
+            MessageBox.Show(builder.ToString(), "Perf");
+
+            return;
         }
 
         if (!Extractor.IsValidMainGameFolder(SettingsController.CurrentSettings?.MainGameFolderPath ?? string.Empty, serverType))

@@ -49,6 +49,8 @@ public class Extractor
 
     public static bool IsBinFileNewer(string toolFilePath, string mainGameFolder, ServerType serverType, string binFileName)
     {
+        return true;
+
         try
         {
             string mainGameFolderPath = Path.Combine(mainGameFolder, GetServerTypeString(serverType));
@@ -100,6 +102,5 @@ public class Extractor
     public void Dispose()
     {
         _localizationData.Dispose();
-        GC.SuppressFinalize(this);
     }
 }

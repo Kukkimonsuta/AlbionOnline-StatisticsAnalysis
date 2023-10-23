@@ -1,5 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text;
+using Newtonsoft.Json;
 using System.Xml;
+using StatisticAnalysisTool.Extractor.IO;
 using Formatting = Newtonsoft.Json.Formatting;
 
 namespace StatisticAnalysisTool.Extractor;
@@ -38,16 +40,15 @@ internal class BinaryDumper
 
         var finalJsonPath = Path.Combine(outputFolderPath, binFileWoe + ".json");
 
-        await using var memoryStream = new MemoryStream();
-        await BinaryDecrypter.DecryptBinaryFileAsync(binFilePath, memoryStream);
-        memoryStream.Position = 0;
+        var stream = new BinFileStream(binFilePath);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
 
         var xmlDocument = new XmlDocument();
         var xmlReaderSettings = new XmlReaderSettings
         {
             IgnoreComments = true
         };
-        var xmlReader = XmlReader.Create(memoryStream, xmlReaderSettings);
+        var xmlReader = XmlReader.Create(reader, xmlReaderSettings);
         xmlDocument.Load(xmlReader);
 
         await File.WriteAllTextAsync(finalJsonPath, JsonConvert.SerializeXmlNode(xmlDocument, Formatting.Indented, false));

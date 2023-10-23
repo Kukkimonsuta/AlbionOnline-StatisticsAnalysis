@@ -1,5 +1,6 @@
-﻿using System.Text;
+using System.Text;
 using System.Xml;
+using StatisticAnalysisTool.Extractor.IO;
 
 namespace StatisticAnalysisTool.Extractor;
 
@@ -8,9 +9,9 @@ internal class ItemData : IDisposable
     public static async Task CreateItemDataAsync(string mainGameFolder, LocalizationData localizationData, string outputFolderPath, string outputFileNameWithExtension = "indexedItems.json")
     {
         var itemBinPath = Path.Combine(mainGameFolder, ".\\Albion-Online_Data\\StreamingAssets\\GameData\\items.bin");
-        var itemDataByteArray = await BinaryDecrypter.DecryptAndDecompressAsync(itemBinPath);
+        await using var stream = new BinFileStream(itemBinPath);
 
-        ExtractFromByteArray(itemDataByteArray.ToArray(), GetExportStream(outputFolderPath, outputFileNameWithExtension), localizationData);
+        await ExtractFromStreamAsync(stream, GetExportStream(outputFolderPath, outputFileNameWithExtension), localizationData);
     }
 
     private static Stream GetExportStream(string outputFolderPath, string outputFileNameWithExtension)
@@ -20,12 +21,14 @@ internal class ItemData : IDisposable
         return stream;
     }
 
-    private static void ExtractFromByteArray(byte[] itemDataByteArray, Stream outputStream, LocalizationData localizationData)
+    private static async Task ExtractFromStreamAsync(Stream inputStream, Stream outputStream, LocalizationData localizationData)
     {
         var journals = new List<IdContainer>();
 
+        using var reader = new StreamReader(inputStream, Encoding.UTF8);
+
         var xmlDoc = new XmlDocument();
-        xmlDoc.LoadXml(RemoveNonPrintableCharacters(Encoding.UTF8.GetString(RemoveBom(itemDataByteArray))));
+        xmlDoc.Load(reader);
 
         using var childNodes = xmlDoc.LastChild?.ChildNodes;
 
@@ -167,32 +170,5 @@ internal class ItemData : IDisposable
         }
 
         return null;
-    }
-
-    private static string RemoveNonPrintableCharacters(string input)
-    {
-        return new string(input.Where(c => !char.IsControl(c) || char.IsWhiteSpace(c)).ToArray());
-    }
-
-    private static byte[] RemoveBom(byte[] byteArray)
-    {
-        byte[] utf8Bom = { 0xEF, 0xBB, 0xBF };
-
-        if (byteArray.Length >= utf8Bom.Length && byteArray[0] == utf8Bom[0] && byteArray[1] == utf8Bom[1] && byteArray[2] == utf8Bom[2])
-        {
-            return byteArray.Skip(utf8Bom.Length).ToArray();
-        }
-
-        return byteArray;
-    }
-
-    public void Dispose()
-    {
-        GC.SuppressFinalize(this);
-    }
-
-    ~ItemData()
-    {
-        Dispose();
     }
 }
